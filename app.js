@@ -1,21 +1,23 @@
-// Import express and create Express app
+// Import express and create Express app, plus other requires
 const express = require("express");
-const methodOverride = require('method-override')
 const app = express();
 
-// Path module for file system helper methods
-const path = require("path");
+const mongoose = require('mongoose'); // MongoDB object modeling
+const methodOverride = require('method-override');;
+const engine = require("ejs-mate"); // EJS engine (ejs-mate)
+const path = require("path");   // Path module for file system helper methods
+const Campground = require("./models/campground"); // Import models
 
 // Set views directory and view engine for Express
+app.engine("ejs", engine);
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
 // Express middleware
-app.use(express.urlencoded({ extended: true }));
-app.use(methodOverride("_method"))
+app.use(express.urlencoded({ extended: true })); // Parse req body
+app.use(methodOverride("_method"));
 
 // Connection to the MongoDB through the mongoose module
-const mongoose = require('mongoose');
 mongoose.connect('mongodb://localhost:27017/test');
 
 const db = mongoose.connection;
@@ -24,11 +26,10 @@ db.once("open", () => {
     console.log("Connected to Database");
 });
 
-// Import models
-const Campground = require("./models/campground");
 
-
-// Router
+// --------------------------------------
+//                Router
+// --------------------------------------
 app.get("/", (req, res) => {
     res.render("home");
 });
