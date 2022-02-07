@@ -6,10 +6,16 @@ const mongoose = require("mongoose"); // MongoDB object modeling
 const methodOverride = require("method-override");
 const engine = require("ejs-mate"); // EJS engine (ejs-mate)
 const path = require("path"); // Path module for file system helper methods
-const Campground = require("./models/campground"); // Import models
 const catchAsync = require("./utils/catchAsync");
 const ExpressError = require("./utils/ExpressError");
-const { campgroundValidationSchema } = require("./validationSchemas");
+const {
+  campgroundValidationSchema,
+  reviewValidationSchema,
+} = require("./validationSchemas");
+
+// Import mongoose models
+const Campground = require("./models/campground");
+const Review = require("./models/review");
 
 // Set views directory and view engine for Express
 app.engine("ejs", engine);
@@ -21,7 +27,7 @@ app.use(express.urlencoded({ extended: true })); // Parse req body
 app.use(methodOverride("_method"));
 
 // Connection to the MongoDB through the mongoose module
-mongoose.connect("mongodb://localhost:27017/YelpCamp");
+mongoose.connect("mongodb://127.0.0.1:27017/YelpCamp");
 
 const db = mongoose.connection;
 db.on("error", console.error.bind(console, "connection error:"));
@@ -29,11 +35,20 @@ db.once("open", () => {
   console.log("Connected to Database");
 });
 
-// Validate campground middleware
+// Client-side validation middleware
 const validateCampground = (req, res, next) => {
   const { error } = campgroundValidationSchema.validate(req.body);
   if (error) {
-    console.log(error);
+    const msg = error.details.map((el) => el.message).join(",");
+    throw new ExpressError(msg, 400);
+  } else {
+    next();
+  }
+};
+
+const validateReview = (req, res, next) => {
+  const { error } = reviewValidationSchema.validate(req.body);
+  if (error) {
     const msg = error.details.map((el) => el.message).join(",");
     throw new ExpressError(msg, 400);
   } else {
@@ -73,7 +88,9 @@ app.post(
 app.get(
   "/campgrounds/:id",
   catchAsync(async (req, res) => {
-    const campground = await Campground.findById(req.params.id);
+    const campground = await Campground.findById(req.params.id).populate(
+      "reviews"
+    );
     res.render("campgrounds/show", { campground });
   })
 );
@@ -101,6 +118,19 @@ app.delete(
     const id = req.params.id;
     await Campground.findByIdAndDelete(id);
     res.redirect("/campgrounds");
+  })
+);
+
+app.post(
+  "/campgrounds/:id/reviews",
+  validateReview,
+  catchAsync(async (req, res) => {
+    const campground = await Campground.findById(req.params.id);
+    const review = new Review(req.body.review);
+    campground.reviews.push(review);
+    await review.save();
+    await campground.save();
+    res.redirect(`/campgrounds/${campground._id}`);
   })
 );
 
